@@ -1,6 +1,7 @@
 use nalgebra::{DMatrix, DVector};
-use rand::Rng;
+use rand::{rngs::ThreadRng, Rng};
 use std::{f32::consts::PI, time::Instant};
+
 #[derive(Clone, Copy)]
 enum ActivationFunction {
     None,
@@ -21,15 +22,21 @@ struct DenseLayer {
 
 
 impl DenseLayer {
+    fn next_gaussian(mu: f32, sigma: f32, rng: &mut ThreadRng) -> f32 {
+        let u1: f32 = 1.0 - rng.gen::<f32>(); // Uniform(0,1] random doubles
+        let u2: f32 = 1.0 - rng.gen::<f32>();
+        let rand_std_normal: f32 = ((-2.0 * u1.ln()).sqrt()) * (2.0 * std::f32::consts::PI * u2).sin(); // Box-Muller transform
+        mu + sigma * rand_std_normal
+    }
     fn new(input_size: usize, output_size: usize, activ: ActivationFunction) -> Self {
         let mut rng = rand::thread_rng();
-        let std_dev = 1.0; // Example for small network, adjust accordingly
+        let std_dev = (2.0/(output_size as f32+input_size as f32)).sqrt(); // Example for small network, adjust accordingly
 
         let weights = DMatrix::<f32>::from_fn(output_size, input_size, |_, _| {
-            rng.gen_range(-std_dev..std_dev)
+            DenseLayer::next_gaussian(0.0,std_dev, &mut rng)
         });
         let biases = DVector::<f32>::from_fn(output_size, |_, _| {
-            rng.gen_range(-std_dev / 2.0..std_dev / 2.0)
+            DenseLayer::next_gaussian(0.0,std_dev, &mut rng)
         });
 
         let weights_momentum = DMatrix::<f32>::zeros(output_size, input_size);
@@ -123,10 +130,10 @@ fn main() {
         DVector::from_vec(vec![0.0]),
     ];
 
-    let mut network = NeuralNetwork::new(&[2, 10,10,10,10,10, 1], ActivationFunction::ReLU);
+    let mut network = NeuralNetwork::new(&[2, 5, 1], ActivationFunction::None);
 
-    let learning_rate = 0.001;
-    let momentum = 0.85;
+    let learning_rate = 0.01;
+    let momentum = 0.75;
     let epochs = 10000;
     let now = Instant::now();
     for i in 0..epochs {
